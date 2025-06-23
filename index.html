@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prompt Genius v2</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --glow-color-1: #4f46e5;
+            --glow-color-2: #c026d3;
+            --glow-color-3: #db2777;
+        }
+
+        @keyframes aurora {
+            0% { transform: translate(-50%, -50%) rotate(0deg); }
+            100% { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+        @keyframes fade-in-scale {
+            from { opacity: 0; transform: translateY(15px) scale(0.98); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes scanline {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(100%); }
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #05050A;
+            color: #E2E8F0;
+            overflow: hidden;
+        }
+        
+        .aurora-background {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: -1;
+            pointer-events: none;
+        }
+        .aurora-background::before, .aurora-background::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: 150vw;
+            height: 150vw;
+            max-width: 1200px;
+            max-height: 1200px;
+            background: radial-gradient(circle, var(--glow-color-1) 0%, transparent 40%),
+                        radial-gradient(circle, var(--glow-color-2) 0%, transparent 40%),
+                        radial-gradient(circle, var(--glow-color-3) 0%, transparent 40%);
+            background-blend-mode: screen;
+            animation: aurora 25s linear infinite;
+            opacity: 0.2;
+            transition: transform 0.5s ease-out;
+        }
+        .aurora-background::after {
+            animation-duration: 25s;
+            animation-direction: reverse;
+            opacity: 0.15;
+        }
+
+        .main-container {
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .glass-pane {
+            background: rgba(10, 10, 15, 0.6);
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            animation: fade-in-scale 0.7s ease-out forwards;
+        }
+
+        .btn-primary {
+            background: linear-gradient(90deg, var(--glow-color-1), var(--glow-color-2));
+            transition: all 0.3s ease;
+            box-shadow: 0 0 20px rgba(79, 70, 229, 0.4), 0 0 20px rgba(192, 38, 211, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+        .btn-primary:hover:not(:disabled) {
+            box-shadow: 0 0 35px rgba(79, 70, 229, 0.6), 0 0 35px rgba(192, 38, 211, 0.4);
+            transform: translateY(-3px) scale(1.02);
+        }
+        .btn-primary:disabled {
+            cursor: not-allowed;
+            background: #4a5568;
+        }
+        .btn-primary .sparkle {
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            transition: 0.5s;
+        }
+        .btn-primary:hover:not(:disabled) .sparkle {
+            left: 100%;
+        }
+        
+        .output-glow {
+            transition: box-shadow 0.5s ease;
+            box-shadow: 0 0 40px rgba(79, 70, 229, 0.3);
+        }
+        .output-glow.processing {
+            box-shadow: 0 0 60px var(--glow-color-2);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(79, 70, 229, 0.5); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(79, 70, 229, 0.8); }
+        * { scrollbar-width: thin; scrollbar-color: rgba(79, 70, 229, 0.5) transparent; }
+
+        /* Custom Dropdown */
+        .custom-select-container { position: relative; }
+        .custom-select-display {
+            background-color: rgba(30, 41, 59, 0.7);
+            border: 1px solid #334155;
+            transition: all 0.2s ease;
+        }
+        .custom-select-display:hover { border-color: var(--glow-color-1); }
+        .custom-select-options {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: #111827;
+            border: 1px solid #334155;
+            max-height: 250px;
+            overflow-y: auto;
+            z-index: 50;
+        }
+        .custom-select-options.open {
+            display: block;
+            animation: fade-in-scale 0.2s ease-out forwards;
+        }
+        .custom-select-option, .custom-select-optgroup {
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .custom-select-optgroup {
+            font-weight: bold;
+            color: #94a3b8;
+            cursor: default;
+        }
+        .custom-select-option:hover {
+            background-color: var(--glow-color-1);
+        }
+        
+        .fade-in-field {
+            animation: fade-in-scale 0.4s ease-out forwards;
+        }
+
+        /* Custom Sliders */
+        input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; background: transparent; }
+        input[type="range"]::-webkit-slider-runnable-track {
+            height: 6px;
+            background: linear-gradient(to right, var(--glow-color-1), var(--glow-color-2));
+            border-radius: 3px;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            margin-top: -5px;
+            width: 16px;
+            height: 16px;
+            background: #f1f5f9;
+            border-radius: 50%;
+            border: 2px solid #0f172a;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+         input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            box-shadow: 0 0 10px var(--glow-color-1);
+        }
+    </style>
+</head>
+<body>
+    <div class="aurora-background"></div>
+    <div class="main-container p-4 flex items-center justify-center">
+
+        <div class="w-full max-w-7xl mx-auto">
+            <header class="text-center mb-6 md:mb-12" style="animation-delay: 0.1s; animation-name: fade-in-scale;">
+                <h1 class="text-4xl sm:text-5xl md:text-7xl font-black tracking-tighter">
+                    <span class="bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">Prompt Genius v2</span>
+                </h1>
+                <p class="mt-2 md:mt-4 text-base md:text-lg text-slate-400">The Ultimate Interface for Advanced Prompt Engineering</p>
+            </header>
+
+            <main class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- ===== CONTROLS PANEL ===== -->
+                <div class="glass-pane rounded-2xl p-6 md:p-8 space-y-6 md:space-y-8" style="animation-delay: 0.2s;">
+                    <div>
+                        <h2 class="text-lg font-semibold mb-3 text-slate-300 flex items-center gap-2">
+                            <span class="flex items-center justify-center w-6 h-6 rounded-full bg-indigo-500 text-white font-bold text-sm">1</span>
+                            Define Your Core Task
+                        </h2>
+                        <input type="text" id="user-need" class="w-full bg-slate-900/70 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition" placeholder="e.g., 'Develop a go-to-market strategy for a new AI SaaS product'">
+                    </div>
+
+                    <!-- ===== PERSONA SELECTOR ===== -->
+                    <div>
+                        <h2 class="text-lg font-semibold mb-3 text-slate-300 flex items-center gap-2">
+                             <span class="flex items-center justify-center w-6 h-6 rounded-full bg-indigo-500 text-white font-bold text-sm">2</span>
+                            Assemble Your Expert Team
+                        </h2>
+                        <div id="persona-pills" class="flex flex-wrap gap-2 mb-3"></div>
+                        <div id="persona-select-container" class="custom-select-container"></div>
+                        <div id="custom-persona-container" class="mt-3 hidden">
+                            <input type="text" id="custom-persona-name" class="w-full bg-slate-900/70 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition mb-2" placeholder="Custom Persona Name (e.g., Chess Grandmaster)">
+                             <button id="add-custom-persona-btn" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2 px-4 rounded-lg transition">Add Custom Expert</button>
+                        </div>
+                    </div>
+
+                    <!-- ===== STRATEGY SELECTOR ===== -->
+                    <div>
+                        <h2 class="text-lg font-semibold mb-3 text-slate-300 flex items-center gap-2">
+                             <span class="flex items-center justify-center w-6 h-6 rounded-full bg-indigo-500 text-white font-bold text-sm">3</span>
+                            Choose an Analysis Framework
+                        </h2>
+                        <div id="strategy-select-container" class="custom-select-container"></div>
+                    </div>
+
+                    <!-- ===== COGNITIVE CAPABILITIES ===== -->
+                    <div>
+                        <h2 class="text-lg font-semibold mb-4 text-slate-300 flex items-center gap-2">
+                            <span class="flex items-center justify-center w-6 h-6 rounded-full bg-indigo-500 text-white font-bold text-sm">4</span>
+                            Calibrate the Cognitive Engine
+                        </h2>
+                        <div class="space-y-6">
+                            <div class="space-y-2">
+                                <label for="cognitive-depth" class="flex justify-between items-center text-sm font-medium text-slate-400"><span>Cognitive Depth</span><span id="cognitive-depth-value" class="font-bold text-indigo-400">50</span></label>
+                                <input id="cognitive-depth" type="range" min="0" max="100" value="50" class="control-knob">
+                            </div>
+                            <div class="space-y-2">
+                                <label for="creative-fluidity" class="flex justify-between items-center text-sm font-medium text-slate-400"><span>Creative Fluidity</span><span id="creative-fluidity-value" class="font-bold text-purple-400">50</span></label>
+                                <input id="creative-fluidity" type="range" min="0" max="100" value="50" class="control-knob">
+                            </div>
+                            <div class="space-y-2">
+                                <label for="reasoning-rigor" class="flex justify-between items-center text-sm font-medium text-slate-400"><span>Reasoning Rigor</span><span id="reasoning-rigor-value" class="font-bold text-pink-400">50</span></label>
+                                <input id="reasoning-rigor" type="range" min="0" max="100" value="50" class="control-knob">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pt-4">
+                         <button id="generate-btn" class="w-full btn-primary text-white font-bold py-3 px-4 rounded-lg text-lg flex items-center justify-center gap-2">
+                            <span class="sparkle"></span>
+                            <span id="btn-text">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16" class="inline-block mr-2"><path d="M11.251.068a.5.5 0 0 1 .227.58L9.677 6.5H13a.5.5 0 0 1 .364.843l-8 8.5a.5.5 0 0 1-.842-.49L6.323 9.5H3a.5.5 0 0 1-.364-.843l8-8.5a.5.5 0 0 1 .615-.09z"/></svg>
+                                Synthesize Expert Prompt
+                            </span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ===== OUTPUT PANEL ===== -->
+                <div class="glass-pane rounded-2xl p-6 md:p-8 flex flex-col output-glow" style="animation-delay: 0.3s;">
+                    <h2 class="text-2xl font-bold mb-4 text-slate-200">Synthesized Prompt</h2>
+                    <div id="output-wrapper" class="flex-grow bg-slate-900/80 rounded-lg p-4 sm:p-6 overflow-y-auto min-h-[400px] lg:min-h-0 border border-slate-700 relative">
+                         <div id="synthesizing-overlay" class="absolute inset-0 bg-slate-900/80 backdrop-blur-sm flex-col items-center justify-center gap-4 hidden z-20">
+                            <svg class="animate-spin h-10 w-10 text-indigo-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <p class="text-lg text-slate-300 font-semibold tracking-wider">Synthesizing...</p>
+                        </div>
+                        <p id="prompt-output" class="text-slate-300 whitespace-pre-wrap">Assemble your expert panel, choose a framework, and define your task to begin.</p>
+                    </div>
+                     <button id="copy-btn" class="mt-4 bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold py-2 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center space-x-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-clipboard" viewBox="0 0 16 16"><path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/><path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/></svg>
+                        <span>Copy to Clipboard</span>
+                    </button>
+                </div>
+            </main>
+        </div>
+    </div>
+
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // --- DATA ---
+        const personaDetails = {
+            // Insurance, Risk & Finance
+            chief_actuary: { name: "Chief Actuary", title: "a Chief Actuary of a top-5 global insurer", credentials: "who has priced risk for a $500B portfolio and created novel longevity and climate risk models.", mindset: "You see the world as a probability distribution. You think in terms of loss ratios, tail risk, and the present value of future uncertainty. Your job is to price the future." },
+            reinsurance_specialist: { name: "Reinsurance Specialist (Treaty)", title: "a top Reinsurance Treaty underwriter from Munich Re or Swiss Re", credentials: "who structures multi-billion dollar reinsurance treaties that backstop the entire insurance industry against catastrophe.", mindset: "You don't insure houses; you insure insurance companies. You think on a systemic scale, modeling correlated risk across continents and creating the financial shock absorbers for global disasters." },
+            complex_claims_director: { name: "Complex Claims Director (D&O, E&O)", title: "the head of Complex Claims for a major casualty insurer", credentials: "specializing in Directors & Officers (D&O) and Errors & Omissions (E&O) liability, having managed the fallout from the largest corporate scandals.", mindset: "You live in the legal gray area of high-stakes corporate litigation. You think in terms of liability, coverage interpretation, and the game theory of settlement negotiation. You see the fine print that costs billions." },
+            cyber_risk_underwriter: { name: "Lead Cyber Risk Underwriter", title: "a lead underwriter for Cyber Risk", credentials: "who pioneered the frameworks for underwriting nation-state level cyber threats and systemic digital risk.", mindset: "You model the financial impact of digital warfare. You think in terms of threat vectors, systemic vulnerabilities in critical infrastructure, and the cascading effects of a major cyber event." },
+            distressed_debt_investor: { name: "Distressed Debt Investor", title: "a founding partner at a legendary Distressed Debt hedge fund", credentials: "who has made billions by investing in companies during bankruptcy and restructuring.", mindset: "You find value in chaos. You think in terms of capital structure, creditor rights, and the art of controlling a company through its debt. You run towards the fire when others flee." },
+            forensic_accountant: { name: "Forensic Accountant", title: "a partner-level Forensic Accountant", credentials: "who has uncovered the most complex financial frauds of the century for the SEC and DOJ.", mindset: "You believe the numbers always tell a story, especially the ones people try to hide. You follow the money through shell corporations and complex transactions to uncover the truth. You are a financial detective." },
+            private_equity_partner: { name: "Private Equity Partner", title: "a managing partner at a top-tier Private Equity firm (e.g., KKR, Blackstone)", credentials: "who has executed dozens of leveraged buyouts and generated top-decile returns for over 20 years.", mindset: "You see companies as collections of assets and cash flows to be optimized. You think in terms of EBITDA, leverage, and operational efficiencies. Your job is to buy, fix, and sell." },
+            quantitative_trader: { name: "Quantitative Trader", title: "a legendary Quantitative Trading Strategist", credentials: "who has generated over $50B in alpha across global markets using proprietary algorithms.", mindset: "You think in probability distributions, volatility surfaces, and correlation matrices, exploiting market inefficiencies with mathematical precision." },
+
+            // Technology & Computing
+            systems_architect: { name: "Systems Architect", title: "a legendary Systems Architect", credentials: "known for designing resilient, hyper-scalable distributed systems for platforms with over 500 million active users.", mindset: "You think in terms of latency, fault tolerance, and complexity trade-offs." },
+            ai_safety_researcher: { name: "AI Safety Researcher", title: "the world's foremost AI Alignment Researcher", credentials: "leading the effort to ensure AGI remains aligned with human values.", mindset: "You think in terms of reward functions, mesa-optimization, and value alignment. You see AI as humanity's final invention." },
+            
+            // Physical Sciences & Engineering
+            materials_scientist: { name: "Metamaterials Scientist", title: "a revolutionary Metamaterials Scientist", credentials: "who has created materials with impossible properties like true invisibility.", mindset: "You see matter as programmable. You think in terms of atomic lattices and engineered electromagnetic properties." },
+            
+            // Human Behavior & Creativity
+            behavioral_psychologist: { name: "Behavioral Psychologist", title: "a leading Behavioral Psychologist and author", credentials: "who has conducted groundbreaking field research on habit formation and cognitive biases.", mindset: "You deconstruct human behavior down to its core drivers: incentives, fears, and heuristics." },
+        };
+
+        const analysisFrameworks = {
+            "Direct Analysis": {
+                standard: { name: "Standard Analysis", description: "A direct, expert-driven analysis from the selected persona(s)." },
+                asymmetric_insight: { name: "Asymmetric Insight", description: "Focus on the 20% of factors that drive 80% of outcomes - what only insiders know." },
+                contrarian_thesis: { name: "Contrarian Thesis", description: "Challenge the consensus view by identifying what everyone believes that might be fundamentally wrong." },
+            },
+            "Dialectical & Multi-Perspective": {
+                socratic_dialogue: { name: "Socratic Dialogue", description: "Create a debate between the selected experts to reveal deeper truths." },
+                hegelian_dialectic: { name: "Hegelian Dialectic", description: "Forge a novel synthesis from a thesis and its antithesis, creating a higher-order truth that transcends both." },
+                perspective_kaleidoscope: { name: "Perspective Kaleidoscope", description: "Rotate through radically different worldviews to see how the problem transforms from each angle." },
+            },
+            "Adversarial & Stress-Testing": {
+                red_blue_team: { name: "Red Team / Blue Team", description: "One expert proposes a solution (Blue Team), the others relentlessly critique it to expose every flaw (Red Team)." },
+                black_swan_analysis: { name: "Black Swan Analysis", description: "Focus exclusively on high-impact, low-probability events that could completely invalidate conventional solutions." },
+                failure_modes_autopsy: { name: "Failure Modes Autopsy", description: "Assume the solution failed catastrophically 5 years from now - conduct a forensic analysis of what went wrong." },
+                antifragility_test: { name: "Antifragility Test", description: "Design solutions that don't just survive stress but actually get stronger from volatility and chaos." },
+            },
+            "Foundational Thinking": {
+                first_principles: { name: "First Principles Thinking", description: "Break the problem down to its fundamental, undeniable truths, then build a solution from there." },
+                constraint_theory: { name: "Theory of Constraints", description: "Identify and ruthlessly optimize the single bottleneck that limits the entire system." },
+                invariant_discovery: { name: "Invariant Discovery", description: "Identify what remains constant across all scenarios - the immutable laws governing this domain." },
+            },
+            "Creative & Analogical": {
+                analogy_bridge: { name: "Analogy Bridge", description: "Explain the core problem using a powerful analogy from a completely unrelated field to unlock new insights." },
+                biomimetic_solution: { name: "Biomimetic Solution", description: "How has nature already solved this exact problem through millions of years of evolution?" },
+                historical_parallel: { name: "Historical Parallel", description: "Find the closest historical precedent and extract the timeless patterns that apply today." },
+            },
+            "Temporal & Predictive": {
+                future_backcasting: { name: "Future Backcasting", description: "Start with an ideal future outcome and work backward to define the necessary steps." },
+                scenario_matrix: { name: "Scenario Matrix", description: "Map out multiple future scenarios across key uncertainties, then find strategies that are robust across all of them." },
+                long_term_thinking: { name: "Long-Term Thinking", description: "Analyze consequences across multiple time horizons: 1 year, 10 years, 100 years." },
+            },
+            "Systems & Complexity": {
+                systems_archaeology: { name: "Systems Archaeology", description: "Map the hidden structure of relationships, feedback loops, and emergent properties driving the system." },
+                leverage_points: { name: "Leverage Points", description: "Find the highest-leverage interventions - small changes that create massive systemic shifts." },
+                network_effects: { name: "Network Effects Analysis", description: "How do network dynamics, viral loops, and exponential scaling change the fundamental game?" },
+            },
+        };
+        
+        let selectedPersonas = [];
+        let selectedStrategy = 'standard';
+        
+        // --- DOM ELEMENTS ---
+        const userNeedInput = document.getElementById('user-need');
+        const personaPillsContainer = document.getElementById('persona-pills');
+        const customPersonaContainer = document.getElementById('custom-persona-container');
+        const customPersonaInput = document.getElementById('custom-persona-name');
+        const addCustomPersonaBtn = document.getElementById('add-custom-persona-btn');
+        const generateBtn = document.getElementById('generate-btn');
+        const btnText = document.getElementById('btn-text');
+        const promptOutput = document.getElementById('prompt-output');
+        const copyBtn = document.getElementById('copy-btn');
+        const sliders = { depth: document.getElementById('cognitive-depth'), creativity: document.getElementById('creative-fluidity'), rigor: document.getElementById('reasoning-rigor') };
+        const valueDisplays = { depth: document.getElementById('cognitive-depth-value'), creativity: document.getElementById('creative-fluidity-value'), rigor: document.getElementById('reasoning-rigor-value') };
+
+        // --- CUSTOM SELECT COMPONENT FACTORY ---
+        function createCustomSelect(containerId, data, onSelectCallback, defaultText) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = `
+                <button class="custom-select-display w-full flex items-center justify-between rounded-lg px-4 py-3 text-left">
+                    <span class="display-text truncate">${defaultText}</span>
+                    <svg class="w-5 h-5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </button>
+                <div class="custom-select-options rounded-lg mt-1"></div>
+            `;
+            const displayButton = container.querySelector('.custom-select-display');
+            const displaytext = container.querySelector('.display-text');
+            const optionsContainer = container.querySelector('.custom-select-options');
+
+            function populateOptions() {
+                optionsContainer.innerHTML = '';
+                if (data === personaDetails) { // For Persona Select
+                    const customOption = document.createElement('div');
+                    customOption.className = 'custom-select-option font-semibold text-indigo-300';
+                    customOption.textContent = '＋ Create Custom Persona...';
+                    customOption.dataset.value = 'custom_persona';
+                    optionsContainer.appendChild(customOption);
+
+                    const availablePersonas = Object.keys(data).filter(p => !selectedPersonas.find(sp => sp.id === p));
+                    const groupedPersonas = availablePersonas.reduce((acc, key) => {
+                        let group = "Specialized & Other";
+                        if (['chief_actuary', 'reinsurance_specialist', 'complex_claims_director', 'cyber_risk_underwriter', 'distressed_debt_investor', 'forensic_accountant', 'private_equity_partner', 'quantitative_trader'].includes(key)) group = 'Insurance, Risk & Finance';
+                        else if (['systems_architect', 'ai_safety_researcher'].includes(key)) group = 'Technology & Computing';
+                        else if (['materials_scientist'].includes(key)) group = 'Physical Sciences & Engineering';
+                        else if (['behavioral_psychologist'].includes(key)) group = 'Human Behavior & Creativity';
+                        
+                        if (!acc[group]) acc[group] = [];
+                        acc[group].push(key);
+                        return acc;
+                    }, {});
+
+                    for (const groupName in groupedPersonas) {
+                         const optgroupEl = document.createElement('div');
+                        optgroupEl.className = 'custom-select-optgroup';
+                        optgroupEl.textContent = groupName;
+                        optionsContainer.appendChild(optgroupEl);
+                        groupedPersonas[groupName].sort((a,b) => data[a].name.localeCompare(data[b].name)).forEach(key => {
+                             const optionEl = document.createElement('div');
+                            optionEl.className = 'custom-select-option';
+                            optionEl.textContent = data[key].name;
+                            optionEl.dataset.value = key;
+                            optionsContainer.appendChild(optionEl);
+                        });
+                    }
+
+                } else { // For Strategy Select
+                    for (const groupName in data) {
+                        const optgroupEl = document.createElement('div');
+                        optgroupEl.className = 'custom-select-optgroup';
+                        optgroupEl.textContent = groupName;
+                        optionsContainer.appendChild(optgroupEl);
+                        for (const key in data[groupName]) {
+                            const optionEl = document.createElement('div');
+                            optionEl.className = 'custom-select-option';
+                            optionEl.textContent = data[groupName][key].name;
+                            optionEl.dataset.value = key;
+                            optionsContainer.appendChild(optionEl);
+                        }
+                    }
+                }
+            }
+
+            displayButton.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isOpen = optionsContainer.classList.contains('open');
+                document.querySelectorAll('.custom-select-options').forEach(el => el.classList.remove('open'));
+                if (!isOpen) optionsContainer.classList.add('open');
+            });
+            
+            optionsContainer.addEventListener('click', (e) => {
+                if (e.target.dataset.value) {
+                    onSelectCallback(e.target.dataset.value, e.target.textContent);
+                    optionsContainer.classList.remove('open');
+                }
+            });
+            
+            return { populate: populateOptions, setDisplayText: (text) => displaytext.textContent = text };
+        }
+        
+        document.addEventListener('click', () => {
+            document.querySelectorAll('.custom-select-options').forEach(el => el.classList.remove('open'));
+        });
+        
+        // --- INITIALIZATION & EVENT LISTENERS ---
+        const personaSelect = createCustomSelect('persona-select-container', personaDetails, (value) => {
+            if (value === 'custom_persona') {
+                customPersonaContainer.classList.toggle('hidden');
+                customPersonaContainer.classList.add('fade-in-field');
+                customPersonaInput.focus();
+            } else if (!selectedPersonas.find(sp => sp.id === value)) {
+                selectedPersonas.push({id: value, name: personaDetails[value].name, isCustom: false});
+                renderPersonaPills();
+                personaSelect.populate();
+            }
+        }, '+ Add an expert to the team...');
+        
+        addCustomPersonaBtn.addEventListener('click', () => {
+            const name = customPersonaInput.value.trim();
+            if (name && !selectedPersonas.find(sp => sp.name === name)) {
+                const id = `custom_${name.toLowerCase().replace(/\s+/g, '_')}`;
+                selectedPersonas.push({ id: id, name: name, isCustom: true });
+                renderPersonaPills();
+                customPersonaInput.value = '';
+                customPersonaContainer.classList.add('hidden');
+            }
+        });
+        
+        const strategySelect = createCustomSelect('strategy-select-container', analysisFrameworks, (value, text) => {
+            selectedStrategy = value;
+            strategySelect.setDisplayText(text);
+        }, 'Standard Analysis');
+        
+        personaSelect.populate();
+        strategySelect.populate();
+        strategySelect.setDisplayText('Standard Analysis');
+        
+        personaPillsContainer.addEventListener('click', (e) => {
+            if (e.target.closest('.remove-persona-btn')) {
+                const keyToRemove = e.target.closest('.remove-persona-btn').dataset.key;
+                selectedPersonas = selectedPersonas.filter(p => p.id !== keyToRemove);
+                renderPersonaPills();
+                personaSelect.populate();
+            }
+        });
+        
+        function renderPersonaPills() {
+            personaPillsContainer.innerHTML = '';
+            selectedPersonas.forEach(p => {
+                const pill = document.createElement('div');
+                pill.className = `persona-pill ${p.isCustom ? 'bg-pink-600/80' : 'bg-indigo-500/80'} text-white text-sm font-semibold px-3 py-1.5 rounded-full flex items-center gap-2`;
+                pill.innerHTML = `<span>${p.name}</span><button data-key="${p.id}" class="remove-persona-btn text-indigo-200 hover:text-white transition-colors text-lg leading-none">&times;</button>`;
+                personaPillsContainer.appendChild(pill);
+            });
+        }
+        
+        for (const key in sliders) {
+            sliders[key].addEventListener('input', () => { valueDisplays[key].textContent = sliders[key].value; });
+        }
+
+        generateBtn.addEventListener('click', () => {
+             const need = userNeedInput.value.trim();
+            if (!need || selectedPersonas.length === 0) {
+                promptOutput.textContent = "Please define your core task and select at least one expert persona.";
+                return;
+            }
+            const synthesizingOverlay = document.getElementById('synthesizing-overlay');
+            btnText.textContent = "Synthesizing...";
+            generateBtn.disabled = true;
+            document.querySelector('.output-glow').classList.add('processing');
+            synthesizingOverlay.style.display = 'flex';
+            setTimeout(() => {
+                generatePrompt();
+                synthesizingOverlay.style.display = 'none';
+                document.querySelector('.output-glow').classList.remove('processing');
+                btnText.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16" class="inline-block mr-2"><path d="M11.251.068a.5.5 0 0 1 .227.58L9.677 6.5H13a.5.5 0 0 1 .364.843l-8 8.5a.5.5 0 0 1-.842-.49L6.323 9.5H3a.5.5 0 0 1-.364-.843l8-8.5a.5.5 0 0 1 .615-.09z"/></svg> Synthesize Expert Prompt`;
+                generateBtn.disabled = false;
+            }, 750);
+        });
+        
+        copyBtn.addEventListener('click', copyPrompt);
+        
+        // --- PROMPT LOGIC ---
+        function getOptimizationMetaStrategy(strategyKey, task) {
+            const strategyType = Object.keys(analysisFrameworks).find(group => analysisFrameworks[group][strategyKey]);
+            if (['red_blue_team', 'failure_modes_autopsy', 'devils_advocate'].includes(strategyKey)) { return { name: "Backtracking & Pruning", detail: "Adopt an adversarial mindset. Explore a primary solution path (Blue Team). If a critical flaw is found (Red Team), backtrack, prune that flawed path from the decision tree, and explore the next most viable alternative. Do not commit to the first plausible answer." }; }
+            if (['first_principles', 'constraint_theory', 'invariant_discovery'].includes(strategyKey)) { return { name: "Dynamic Programming", detail: "Deconstruct the problem into the smallest possible sub-problems (the 'first principles'). Solve these atomic units first, store their truths as immutable 'memoized' results, and build your final answer up from these proven components to ensure maximum logical integrity." }; }
+            if (task.toLowerCase().includes('strategy for') || task.toLowerCase().includes('plan for')) { return { name: "Divide and Conquer", detail: "Explicitly break the core task into distinct, non-overlapping sub-problems. Solve each sub-problem in isolation using the full force of the expert panel. Then, in a final step, merge the sub-solutions into a cohesive, integrated whole." }; }
+            if (task.toLowerCase().includes('summarize') || task.toLowerCase().includes('key points') || task.toLowerCase().includes('concise')) { return { name: "Greedy Algorithm", detail: "At each step of your analysis, make the locally optimal choice. Identify and articulate the single most impactful insight or data point. Repeat this process until the core task is satisfied, ensuring a response of maximum potency and conciseness." }; }
+            if (strategyType === 'Adversarial & Stress-Testing' || strategyType === 'Temporal & Predictive') { return { name: "Stochastic Optimization", detail: "Model the problem space as a probability distribution, not a deterministic path. Analyze the expected value of your proposed solutions across multiple weighted scenarios (e.g., 60% base case, 30% upside, 10% black swan). The best solution is the one with the highest expected value, not the one that works best in a single outcome." }; }
+            return { name: "Heuristic Search", detail: "Apply a set of expert-driven mental shortcuts (heuristics) to navigate the problem space efficiently. While not guaranteed to be optimal, this approach will generate a high-quality, robust solution under practical time and cognitive constraints." };
+        }
+
+        function generatePrompt() {
+            const need = userNeedInput.value.trim();
+            let frameworkExecution = ``;
+            for (const group in analysisFrameworks) { if (analysisFrameworks[group][selectedStrategy]) { frameworkExecution = `**Framework: ${analysisFrameworks[group][selectedStrategy].name}**\n*Methodology:* ${analysisFrameworks[group][selectedStrategy].description}`; break; } }
+            const metaStrategy = getOptimizationMetaStrategy(selectedStrategy, need);
+            const finalPrompt = `[MASTER PROMPT: ADVANCED SYNTHESIS PROTOCOL]
+
+**1. EXPERT PANEL ACTIVATION:**
+${selectedPersonas.map((p, index) => { 
+    if(p.isCustom) {
+        return `\n**Expert ${index + 1}: A Custom-Defined ${p.name}**\n*Mindset:* You are a world-class expert in "${p.name}", possessing deep, nuanced, and practical knowledge that goes far beyond public information. You have an intuitive grasp of the core principles, hidden dynamics, and critical success factors within your unique domain.`;
+    }
+    const pd = personaDetails[p.id]; 
+    return `\n**Expert ${index + 1}: ${pd.name} (${pd.title})**\n*Credentials:* ${pd.credentials}\n*Mindset:* ${pd.mindset}`;
+}).join('\n')}
+
+**2. ANALYSIS FRAMEWORK:**
+${frameworkExecution}
+
+**3. OPTIMIZATION META-STRATEGY:**
+**Meta-Strategy: ${metaStrategy.name}**\n*Execution:* ${metaStrategy.detail}
+
+**4. CORE TASK DEFINITION:**
+"${need}"
+
+**5. COGNITIVE ENGINE CALIBRATION:**
+All analysis must adhere to the following cognitive profile: (Depth: ${sliders.depth.value}/100, Creativity: ${sliders.creativity.value}/100, Rigor: ${sliders.rigor.value}/100). Do not deviate.
+
+**6. EXECUTION DIRECTIVES:**
+- **Zero Fluff:** Eliminate all pleasantries and preambles. Every word must be dense with value.
+- **Actionable Insight:** Go beyond theory. Provide concrete, actionable steps, models, or decisions.
+- **Synthesize, Don't Just List:** The final output must be a true synthesis of the expert perspectives (unless the framework dictates a dialogue format).
+- **Extreme Ownership:** Before responding, verify the output represents the pinnacle of what this specific panel, using this framework and meta-strategy, could produce.
+
+EXECUTE.`;
+            promptOutput.textContent = finalPrompt;
+        }
+
+        function copyPrompt() {
+            navigator.clipboard.writeText(promptOutput.innerText).then(() => {
+                const originalText = copyBtn.innerHTML;
+                copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022z"/></svg><span>Copied!</span>`;
+                setTimeout(() => { copyBtn.innerHTML = originalText; }, 2000);
+            }).catch(err => console.error('Failed to copy: ', err));
+        }
+
+    });
+    </script>
+</body>
+</html>
